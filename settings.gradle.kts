@@ -1,1 +1,1 @@
-rootProject.name = "kencodex"
+rootProject.name = "kencode"

@@ -42,9 +42,9 @@ publishing {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
             pom {
-                name.set("kencodex")
+                name.set("kencode")
                 description.set("Pure Kotlin JVM library.")
-                url.set("https://github.com/Eigenity/kencodex")
+                url.set("https://github.com/Eignex/kencode")
                 licenses {
                     license {
                         name.set("Apache-2.0")
@@ -52,9 +52,9 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/Eigenity/kencodex")
-                    connection.set("scm:git:https://github.com/Eigenity/kencodex.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/Eigenity/kencodex.git")
+                    url.set("https://github.com/Eignex/kencode")
+                    connection.set("scm:git:https://github.com/Eignex/kencode.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/Eignex/kencode.git")
                 }
                 developers {
                     developer {
