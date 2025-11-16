@@ -13,8 +13,8 @@ package com.eignex.kencode
  * - width: number of CRC bits (16 for all below)
  */
 class Crc16(
-    private val poly: Int = 0x8408,
-    private val init: Int = 0xFFFF,
+    poly: Int = 0x1021,
+    init: Int = 0xFFFF,
     private val refin: Boolean = true,
     private val refout: Boolean = true,
     private val xorOut: Int = 0xFFFF,
@@ -22,6 +22,11 @@ class Crc16(
 ) : Checksum {
 
     private val mask = (1 shl width) - 1
+
+    // Internal representation is reflected (LSB-first), so pre-reflect poly and init.
+    private val refPoly: Int = poly.reverseBits(width)
+    private val refInit: Int = init.reverseBits(width)
+
     override val size: Int = (width + 7) / 8
 
     override fun compute(
@@ -29,43 +34,27 @@ class Crc16(
         offset: Int,
         length: Int
     ): ByteArray {
-        var crc = init and mask
+        var crc = refInit and mask
 
         for (i in 0 until length) {
-            var b = data[offset + i].toInt() and 0xFF
-            if (refin) {
-                b = b.reverseBits8()
-                crc = crc xor (b and 0xFF)
-            } else {
-                crc = crc xor (b shl (width - 8))
-            }
+            val raw = data[offset + i].toInt() and 0xFF
+            val b = if (refin) raw else raw.reverseBits8()
 
+            crc = crc xor b
             repeat(8) {
-                val bit = (crc and (if (refin) 0x0001 else (1 shl (width - 1)))) != 0
-                crc = if (bit) {
-                    if (refin) {
-                        (crc ushr 1) xor poly
-                    } else {
-                        ((crc shl 1) xor poly) and mask
-                    }
+                crc = if ((crc and 1) != 0) {
+                    (crc ushr 1) xor refPoly
                 } else {
-                    if (refin) {
-                        crc ushr 1
-                    } else {
-                        (crc shl 1) and mask
-                    }
+                    crc ushr 1
                 }
             }
-
             crc = crc and mask
         }
 
-        if (refout) {
-            crc = crc.reverseBits(width)
-        }
+        // Convert from internal reflected form to requested output form.
+        crc = if (refout) crc else crc.reverseBits(width)
 
-        crc = crc xor xorOut
-        crc = crc and mask
+        crc = (crc xor xorOut) and mask
 
         // Output big-endian (high byte first).
         val out = ByteArray(size)
@@ -90,18 +79,21 @@ class Crc16(
  * - width: number of CRC bits (32 for all below)
  */
 class Crc32(
-    private val poly: Int = 0xEDB88320.toInt(), // reversed 0x04C11DB7 for refin=true
-    private val init: Int = 0xFFFFFFFF.toInt(),
+    poly: Int = 0x04C11DB7, // canonical CRC-32 poly
+    init: Int = 0xFFFFFFFF.toInt(),
     private val refin: Boolean = true,
     private val refout: Boolean = true,
     private val xorOut: Int = 0xFFFFFFFF.toInt(),
     private val width: Int = 32
 ) : Checksum {
 
-    // Use Long internally to handle width=32 cleanly.
     private val mask: Long =
         if (width == 32) 0xFFFFFFFFL
         else (1L shl width) - 1L
+
+    // Internal representation: reflected
+    private val refPoly: Long = poly.reverseBits(width).toLong() and mask
+    private val refInit: Long = init.reverseBits(width).toLong() and mask
 
     override val size: Int = (width + 7) / 8
 
@@ -110,52 +102,31 @@ class Crc32(
         offset: Int,
         length: Int
     ): ByteArray {
-        var crc = init.toLong() and mask
+        var crc = refInit
 
         for (i in 0 until length) {
-            var b = data[offset + i].toInt() and 0xFF
-            if (refin) {
-                b = b.reverseBits8()
-                crc = crc xor (b.toLong() and 0xFFL)
-            } else {
-                crc = crc xor ((b.toLong() and 0xFFL) shl (width - 8))
-            }
+            val raw = data[offset + i].toInt() and 0xFF
+            val b = if (refin) raw else raw.reverseBits8()
 
+            crc = crc xor (b.toLong() and 0xFFL)
             repeat(8) {
-                val bitSet = if (refin) {
-                    (crc and 1L) != 0L
+                crc = if ((crc and 1L) != 0L) {
+                    (crc ushr 1) xor refPoly
                 } else {
-                    (crc and (1L shl (width - 1))) != 0L
-                }
-
-                crc = if (bitSet) {
-                    if (refin) {
-                        (crc ushr 1) xor (poly.toLong() and mask)
-                    } else {
-                        ((crc shl 1) xor (poly.toLong() and mask)) and mask
-                    }
-                } else {
-                    if (refin) {
-                        crc ushr 1
-                    } else {
-                        (crc shl 1) and mask
-                    }
+                    crc ushr 1
                 }
             }
-
             crc = crc and mask
         }
 
-        var finalCrc = crc
-
-        if (refout) {
-            // reverseBits(width) operates on Int; clamp via toInt() and then back to Long
-            finalCrc = finalCrc.toInt().reverseBits(width).toLong() and mask
+        var finalCrc = if (refout) {
+            crc
+        } else {
+            crc.toInt().reverseBits(width).toLong() and mask
         }
 
         finalCrc = (finalCrc xor (xorOut.toLong() and mask)) and mask
 
-        // Output big-endian (high byte first).
         val out = ByteArray(size)
         for (i in 0 until size) {
             val shift = 8 * (size - 1 - i)
