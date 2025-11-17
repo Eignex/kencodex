@@ -128,7 +128,7 @@ class BaseCoderTest {
     @Test
     fun chunkLevel_encodeDecode_roundtrip() {
         val rnd = Random(99L)
-        val coder = BaseCoder("0123456789abcdef") // base16
+        val coder = BaseN("0123456789abcdef") // base16
 
         for (len in 1..coder.chunkSize) {
             val bytes = ByteArray(len).also { rnd.nextBytes(it) }

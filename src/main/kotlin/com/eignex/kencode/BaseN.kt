@@ -1,22 +1,21 @@
 package com.eignex.kencode
 
 import java.math.BigInteger
-import java.nio.ByteBuffer
 import kotlin.math.ceil
 import kotlin.math.log2
 import kotlin.math.min
 
-val BASE_62: String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const val BASE_62: String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 /**
  * Base62 encoder/decoder using [BASE_62] alphabet.
  */
-object Base62 : BaseCoder(BASE_62)
+object Base62 : BaseN(BASE_62)
 
 /**
  * Base36 encoder/decoder using the first 36 characters of [BASE_62].
  */
-object Base36 : BaseCoder(BASE_62.take(36))
+object Base36 : BaseN(BASE_62.take(36))
 
 
 /**
@@ -35,7 +34,7 @@ object Base36 : BaseCoder(BASE_62.take(36))
  *
  * Encoding is big-endian.
  */
-open class BaseCoder(
+open class BaseN(
     private val alphabet: String,
     val chunkSize: Int = 32
 ) : ByteCodec {
