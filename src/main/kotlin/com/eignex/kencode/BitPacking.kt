@@ -1,17 +1,5 @@
-package com.eignex.kencode
-
 import java.io.ByteArrayOutputStream
 
-/**
- * Utility for bit-level packing and encoding primitives.
- *
- * Functions include:
- * - Boolean flag packing/unpacking into integers.
- * - ZigZag encoding for signed integers (as used in protobuf and varints).
- * - Varint and varlong (LEB128-style) encoding/decoding.
- *
- * All methods are placeholders and must be implemented.
- */
 object BitPacking {
     // flags -> int/long
     fun packFlagsToInt(vararg flags: Boolean): Int {
@@ -30,7 +18,6 @@ object BitPacking {
         return result
     }
 
-    // ZigZag for signed integers (for varints etc.)
     fun zigZagEncodeInt(value: Int): Int =
         (value shl 1) xor (value shr 31)
 
@@ -44,11 +31,49 @@ object BitPacking {
         (value ushr 1) xor -(value and 1L)
 
     fun writeShort(value: Short, out: ByteArrayOutputStream) {
-        var v = value.toInt()
-        repeat(2) {
-            out.write((v and 0xFF))
-            v = v ushr 2
+        val v = value.toInt() and 0xFFFF
+        out.write((v ushr 8) and 0xFF)
+        out.write(v and 0xFF)
+    }
+
+    fun writeInt(value: Int, out: ByteArrayOutputStream) {
+        out.write((value ushr 24) and 0xFF)
+        out.write((value ushr 16) and 0xFF)
+        out.write((value ushr 8) and 0xFF)
+        out.write(value and 0xFF)
+    }
+
+    fun writeLong(value: Long, out: ByteArrayOutputStream) {
+        out.write(((value ushr 56) and 0xFF).toInt())
+        out.write(((value ushr 48) and 0xFF).toInt())
+        out.write(((value ushr 40) and 0xFF).toInt())
+        out.write(((value ushr 32) and 0xFF).toInt())
+        out.write(((value ushr 24) and 0xFF).toInt())
+        out.write(((value ushr 16) and 0xFF).toInt())
+        out.write(((value ushr 8) and 0xFF).toInt())
+        out.write((value and 0xFF).toInt())
+    }
+
+    fun readShort(data: ByteArray, offset: Int): Short {
+        val b0 = data[offset].toInt() and 0xFF
+        val b1 = data[offset + 1].toInt() and 0xFF
+        return ((b0 shl 8) or b1).toShort()
+    }
+
+    fun readInt(data: ByteArray, offset: Int): Int {
+        var v = 0
+        for (i in 0 until 4) {
+            v = (v shl 8) or (data[offset + i].toInt() and 0xFF)
         }
+        return v
+    }
+
+    fun readLong(data: ByteArray, offset: Int): Long {
+        var v = 0L
+        for (i in 0 until 8) {
+            v = (v shl 8) or (data[offset + i].toLong() and 0xFFL)
+        }
+        return v
     }
 
     fun writeVarInt(value: Int, out: ByteArrayOutputStream) {
@@ -64,14 +89,6 @@ object BitPacking {
         }
     }
 
-    fun writeInt(value: Int, out: ByteArrayOutputStream) {
-        var v = value
-        repeat(4) {
-            out.write((v and 0xFF))
-            v = v ushr 4
-        }
-    }
-
     fun writeVarLong(value: Long, out: ByteArrayOutputStream) {
         var v = value
         while (true) {
@@ -82,14 +99,6 @@ object BitPacking {
                 out.write(((v and 0x7F) or 0x80).toInt())
                 v = v ushr 7
             }
-        }
-    }
-
-    fun writeLong(value: Long, out: ByteArrayOutputStream) {
-        var v = value
-        repeat(8) {
-            out.write((v and 0xFF).toInt())
-            v = v ushr 8
         }
     }
 

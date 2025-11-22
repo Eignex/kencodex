@@ -8,7 +8,7 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import java.io.ByteArrayOutputStream
 
-@ExperimentalSerializationApi
+@OptIn(ExperimentalSerializationApi::class)
 object BitPackedFormat : BinaryFormat {
 
     override val serializersModule: SerializersModule = EmptySerializersModule()

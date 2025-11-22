@@ -2,16 +2,13 @@ package com.eignex.kencode
 
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
-@ExperimentalSerializationApi
+@OptIn(ExperimentalSerializationApi::class)
 class BitPackedDecoder(
     private val input: ByteArray
 ) : Decoder, CompositeDecoder {
@@ -35,70 +32,87 @@ class BitPackedDecoder(
             .filter { descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN }
         booleanIndices = boolIdx.toIntArray()
 
-        booleanValues =
-            if (booleanIndices.isEmpty()) {
-                BooleanArray(0)
-            } else {
-                val (flagsInt, bytesRead) = BitPacking.decodeVarInt(input, position)
-                position += bytesRead
-                BitPacking.unpackFlagsFromInt(flagsInt, booleanIndices.size)
-            }
+        val (flagsInt, bytesRead) = BitPacking.decodeVarInt(input, position)
+        position += bytesRead
+        booleanValues = BitPacking.unpackFlagsFromInt(flagsInt, booleanIndices.size)
 
         return this
     }
 
     override fun decodeBoolean(): Boolean {
-        val idx = currentIndex
-        if (idx < 0) error("Boolean outside of structure is not supported")
-        return decodeBooleanElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeBooleanElement(currentDescriptor, currentIndex)
+        } else {
+            input[position++].toInt() != 0
+        }
     }
 
     override fun decodeByte(): Byte {
-        val idx = currentIndex
-        if (idx < 0) error("Byte outside of structure is not supported")
-        return decodeByteElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeByteElement(currentDescriptor, currentIndex)
+        } else {
+            input[position++]
+        }
     }
 
     override fun decodeShort(): Short {
-        val idx = currentIndex
-        if (idx < 0) error("Short outside of structure is not supported")
-        return decodeShortElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeShortElement(currentDescriptor, currentIndex)
+        } else {
+            readShortPos()
+        }
     }
 
     override fun decodeInt(): Int {
-        val idx = currentIndex
-        if (idx < 0) error("Int outside of structure is not supported")
-        return decodeIntElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeIntElement(currentDescriptor, currentIndex)
+        } else {
+            readIntPos()
+        }
     }
 
     override fun decodeLong(): Long {
-        val idx = currentIndex
-        if (idx < 0) error("Long outside of structure is not supported")
-        return decodeLongElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeLongElement(currentDescriptor, currentIndex)
+        } else {
+            readLongPos()
+        }
     }
 
     override fun decodeFloat(): Float {
-        val idx = currentIndex
-        if (idx < 0) error("Float outside of structure is not supported")
-        return decodeFloatElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeFloatElement(currentDescriptor, currentIndex)
+        } else {
+            java.lang.Float.intBitsToFloat(readIntPos())
+        }
     }
 
     override fun decodeDouble(): Double {
-        val idx = currentIndex
-        if (idx < 0) error("Double outside of structure is not supported")
-        return decodeDoubleElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeDoubleElement(currentDescriptor, currentIndex)
+        } else {
+            java.lang.Double.longBitsToDouble(readLongPos())
+        }
     }
 
     override fun decodeChar(): Char {
-        val idx = currentIndex
-        if (idx < 0) error("Char outside of structure is not supported")
-        return decodeCharElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeCharElement(currentDescriptor, currentIndex)
+        } else {
+            readShortPos().toInt().toChar()
+        }
     }
 
     override fun decodeString(): String {
-        val idx = currentIndex
-        if (idx < 0) error("String outside of structure is not supported")
-        return decodeStringElement(currentDescriptor, idx)
+        return if (inStructure) {
+            decodeStringElement(currentDescriptor, currentIndex)
+        } else {
+            val (len, bytesRead) = BitPacking.decodeVarInt(input, position)
+            position += bytesRead
+            val bytes = input.copyOfRange(position, position + len)
+            position += len
+            bytes.toString(Charsets.UTF_8)
+        }
     }
 
     @ExperimentalSerializationApi
@@ -125,10 +139,6 @@ class BitPackedDecoder(
         return this
     }
 
-    // ---------------------------------------------------------------------
-    // CompositeDecoder API
-    // ---------------------------------------------------------------------
-
     override fun endStructure(descriptor: SerialDescriptor) {
         inStructure = false
         currentIndex = -1
@@ -152,31 +162,8 @@ class BitPackedDecoder(
         index: Int
     ): Boolean {
         val pos = booleanPos(index)
-        if (pos < 0) error("Boolean element at index $index not registered as boolean")
         return booleanValues[pos]
     }
-
-    private fun readFixedIntLE(): Int {
-        val b0 = input[position++].toInt() and 0xFF
-        val b1 = input[position++].toInt() and 0xFF
-        val b2 = input[position++].toInt() and 0xFF
-        val b3 = input[position++].toInt() and 0xFF
-        return b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
-    }
-
-    private fun readFixedLongLE(): Long {
-        var result = 0L
-        var shift = 0
-        repeat(8) {
-            val b = input[position++].toInt() and 0xFF
-            result = result or ((b.toLong() and 0xFF) shl shift)
-            shift += 8
-        }
-        return result
-    }
-
-    private fun List<Annotation>.hasVarInt(): Boolean = any { it is VarInt }
-    private fun List<Annotation>.hasZigZag(): Boolean = any { it is ZigZag }
 
     override fun decodeIntElement(
         descriptor: SerialDescriptor,
@@ -191,7 +178,7 @@ class BitPackedDecoder(
             position += bytesRead
             if (zigZag) BitPacking.zigZagDecodeInt(raw) else raw
         } else {
-            readFixedIntLE()
+            readIntPos()
         }
     }
 
@@ -208,7 +195,7 @@ class BitPackedDecoder(
             position += bytesRead
             if (zigZag) BitPacking.zigZagDecodeLong(raw) else raw
         } else {
-            readFixedLongLE()
+            readLongPos()
         }
     }
 
@@ -223,36 +210,28 @@ class BitPackedDecoder(
         descriptor: SerialDescriptor,
         index: Int
     ): Short {
-        val b0 = input[position++].toInt() and 0xFF
-        val b1 = input[position++].toInt() and 0xFF
-        val v = b0 or (b1 shl 8)
-        return v.toShort()
+        return readShortPos()
     }
 
     override fun decodeCharElement(
         descriptor: SerialDescriptor,
         index: Int
     ): Char {
-        val b0 = input[position++].toInt() and 0xFF
-        val b1 = input[position++].toInt() and 0xFF
-        val v = b0 or (b1 shl 8)
-        return v.toChar()
+        return readShortPos().toInt().toChar()
     }
 
     override fun decodeFloatElement(
         descriptor: SerialDescriptor,
         index: Int
     ): Float {
-        val bits = readFixedIntLE()
-        return java.lang.Float.intBitsToFloat(bits)
+        return java.lang.Float.intBitsToFloat(readIntPos())
     }
 
     override fun decodeDoubleElement(
         descriptor: SerialDescriptor,
         index: Int
     ): Double {
-        val bits = readFixedLongLE()
-        return java.lang.Double.longBitsToDouble(bits)
+        return java.lang.Double.longBitsToDouble(readLongPos())
     }
 
     override fun decodeStringElement(
@@ -306,5 +285,23 @@ class BitPackedDecoder(
         previousValue: T?
     ): T {
         error("Nullable elements are not supported in this format")
+    }
+
+    private fun readShortPos(): Short {
+        return BitPacking.readShort(input, position).also {
+            position += 2
+        }
+    }
+
+    private fun readIntPos(): Int {
+        return BitPacking.readInt(input, position).also {
+            position += 4
+        }
+    }
+
+    private fun readLongPos(): Long {
+        return BitPacking.readLong(input, position).also {
+            position += 8
+        }
     }
 }
