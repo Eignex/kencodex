@@ -13,7 +13,7 @@ annotation class VarInt
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class ZigZag
+annotation class VarUInt
 
 fun List<Annotation>.hasVarInt(): Boolean = any { it is VarInt }
-fun List<Annotation>.hasZigZag(): Boolean = any { it is ZigZag }
+fun List<Annotation>.hasVarUInt(): Boolean = any { it is VarUInt }

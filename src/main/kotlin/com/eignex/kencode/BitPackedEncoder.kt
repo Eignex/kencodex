@@ -184,11 +184,11 @@ class BitPackedEncoder(
         value: Int
     ) {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasZigZag()
-        val varInt = anns.hasVarInt() || zigZag
+        val varUInt = anns.hasVarUInt()
+        val varInt = anns.hasVarInt() || varUInt
 
         if (varInt) {
-            val v = if (zigZag) BitPacking.zigZagEncodeInt(value) else value
+            val v = if (varUInt) BitPacking.zigZagEncodeInt(value) else value
             BitPacking.writeVarInt(v, dataBuffer)
         } else {
             BitPacking.writeInt(value, dataBuffer)
@@ -201,11 +201,11 @@ class BitPackedEncoder(
         value: Long
     ) {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasZigZag()
-        val varInt = anns.hasVarInt() || zigZag
+        val varUInt = anns.hasVarUInt()
+        val varInt = anns.hasVarInt() || varUInt
 
         if (varInt) {
-            val v = if (zigZag) BitPacking.zigZagEncodeLong(value) else value
+            val v = if (varUInt) BitPacking.zigZagEncodeLong(value) else value
             BitPacking.writeVarLong(v, dataBuffer)
         } else {
             BitPacking.writeLong(value, dataBuffer)

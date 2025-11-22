@@ -170,13 +170,13 @@ class BitPackedDecoder(
         index: Int
     ): Int {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasZigZag()
-        val varInt = anns.hasVarInt() || zigZag
+        val varUInt = anns.hasVarUInt()
+        val varInt = anns.hasVarInt() || varUInt
 
         return if (varInt) {
             val (raw, bytesRead) = BitPacking.decodeVarInt(input, position)
             position += bytesRead
-            if (zigZag) BitPacking.zigZagDecodeInt(raw) else raw
+            if (varUInt) BitPacking.zigZagDecodeInt(raw) else raw
         } else {
             readIntPos()
         }
@@ -187,13 +187,13 @@ class BitPackedDecoder(
         index: Int
     ): Long {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasZigZag()
-        val varInt = anns.hasVarInt() || zigZag
+        val varUInt = anns.hasVarUInt()
+        val varInt = anns.hasVarInt() || varUInt
 
         return if (varInt) {
             val (raw, bytesRead) = BitPacking.decodeVarLong(input, position)
             position += bytesRead
-            if (zigZag) BitPacking.zigZagDecodeLong(raw) else raw
+            if (varUInt) BitPacking.zigZagDecodeLong(raw) else raw
         } else {
             readLongPos()
         }
